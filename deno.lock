@@ -1,0 +1,50 @@
+{
+  "version": "5",
+  "specifiers": {
+    "jsr:@noble/ciphers@2.2.0": "2.2.0",
+    "jsr:@noble/hashes@2.2.0": "2.2.0",
+    "jsr:@std/assert@1.0.19": "1.0.19",
+    "jsr:@std/crypto@1.1.0": "1.1.0",
+    "jsr:@std/encoding@1.0.10": "1.0.10",
+    "jsr:@std/internal@^1.0.12": "1.0.14",
+    "npm:@msgpack/msgpack@3.1.3": "3.1.3"
+  },
+  "jsr": {
+    "@noble/ciphers@2.2.0": {
+      "integrity": "e71aeb5df6ee82370afa654280d377a76c1dd917306e275b09e1e30217d98f0d"
+    },
+    "@noble/hashes@2.2.0": {
+      "integrity": "984d0f07d004ac13a6029ef2b200651b1572fcc952be4b313ef4e312ad696189"
+    },
+    "@std/assert@1.0.19": {
+      "integrity": "eaada96ee120cb980bc47e040f82814d786fe8162ecc53c91d8df60b8755991e",
+      "dependencies": [
+        "jsr:@std/internal"
+      ]
+    },
+    "@std/crypto@1.1.0": {
+      "integrity": "b8d6d0a6377a32b213af2661ed7bf1062d94feac0c57def5526a8e74a95c3ec8"
+    },
+    "@std/encoding@1.0.10": {
+      "integrity": "8783c6384a2d13abd5e9e87a7ae0520a30e9f56aeeaa3bdf910a3eaaf5c811a1"
+    },
+    "@std/internal@1.0.14": {
+      "integrity": "291516b3d4c35024d6ffbc0a9df5bf4c64116e05b50012cf846710152d2ffdf7"
+    }
+  },
+  "npm": {
+    "@msgpack/msgpack@3.1.3": {
+      "integrity": "sha512-47XIizs9XZXvuJgoaJUIE2lFoID8ugvc0jzSHP+Ptfk8nTbnR8g788wv48N03Kx0UkAv559HWRQ3yzOgzlRNUA=="
+    }
+  },
+  "workspace": {
+    "dependencies": [
+      "jsr:@noble/ciphers@2.2.0",
+      "jsr:@noble/hashes@2.2.0",
+      "jsr:@std/assert@1.0.19",
+      "jsr:@std/crypto@1.1.0",
+      "jsr:@std/encoding@1.0.10",
+      "npm:@msgpack/msgpack@3.1.3"
+    ]
+  }
+}
