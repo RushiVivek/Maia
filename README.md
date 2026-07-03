@@ -62,13 +62,37 @@ Every endpoint is gated. A client may present `AUTH_TOKEN` three ways (preferred
 
 ## Deploy (Deno Deploy)
 
-No container. `main.ts` is the entrypoint.
+No container. `main.ts` is the entrypoint. Repo: `github.com/RushiVivek/Maia` (private).
 
-- Push this repo to GitHub and link it in the [Deno Deploy](https://deno.com/deploy) dashboard
-  (auto-deploy on push), or `deployctl deploy --project=maia --entrypoint=main.ts`.
-- Set `GITHUB_OWNER`, `GITHUB_REPO`, `ATLAS_VAULT_ID`, `GITHUB_TOKEN`, `AUTH_TOKEN` as project
-  environment variables (encrypted at rest).
-- You get HTTPS and a stable `*.deno.dev` URL.
+**One-time setup:**
+
+1. [Deno Deploy dashboard](https://dash.deno.com) → **New Project** → link `RushiVivek/Maia`,
+   entrypoint `main.ts`, install `main` branch (auto-deploy on push). Or CLI:
+   `deployctl deploy --project=maia --entrypoint=main.ts`.
+2. Project → **Settings → Environment Variables**, add all five (encrypted at rest):
+   - `GITHUB_OWNER` — the vault repo owner (e.g. `atlas-git-storage`)
+   - `GITHUB_REPO` — the vault repo (e.g. `Test`)
+   - `ATLAS_VAULT_ID` — the atlas vault id (e.g. `maiatest`)
+   - `GITHUB_TOKEN` — a **fresh, read-only, fine-grained PAT** scoped to just the vault repo
+     (Contents: Read-only). Do NOT reuse a PAT that was ever pasted into a shell/chat.
+   - `AUTH_TOKEN` — `openssl rand -hex 32`
+3. You now have HTTPS at `https://<project>.deno.dev`. Open
+   `https://<project>.deno.dev/?token=<AUTH_TOKEN>` once to set the auth cookie.
+
+**Custom domain (`maia.rushivivek.com`):**
+
+1. Deno Deploy → project → **Settings → Domains → Add `maia.rushivivek.com`**. It shows the DNS
+   records to create (an `A`/`CNAME` for the host + a `CNAME`/`TXT` for ACME cert validation).
+2. In **Cloudflare** (rushivivek.com DNS) → **DNS → Records**, add those records. Set the maia
+   record to **DNS only (grey cloud), NOT Proxied** — Cloudflare's proxy breaks Deno Deploy's ACME
+   challenge and TLS. Deno Deploy terminates HTTPS itself.
+3. Back in Deno Deploy → Domains → **Verify / provision certificate**. Once green,
+   `https://maia.rushivivek.com/?token=<AUTH_TOKEN>` works (cert auto-renews).
+
+**Acceptance test (from the phone, after deploy):** open the `?token=` URL → (1) the snapshot
+listing matches the vault, (2) a small file downloads byte-identical, (3) an image/PDF renders
+inline, (4) a video's "copy URL" pastes into VLC and seeks, (5) any endpoint returns 401 without the
+token.
 
 **Memory:** ChaCha20-Poly1305 is one-shot, so peak RAM is ~2× a single chunk. With atlas's
 small-chunk override (~20 MB) this is ~40 MB — comfortably under the Deno Deploy isolate limit. If a
@@ -84,9 +108,41 @@ isolate is evicted, so the first tap after idle is slower, then warm.
 deno task test                 # offline: builds a byte-exact mock vault
 ```
 
-End-to-end against a real vault (read-only, manual):
+End-to-end against a real vault (read-only, manual — hits GitHub, needs the PAT):
 
 ```sh
 MAIA_E2E=1 GITHUB_OWNER=... GITHUB_REPO=... ATLAS_VAULT_ID=... GITHUB_TOKEN=... \
   deno test --allow-net --allow-env test/e2e_test.ts
 ```
+
+## Maintenance (solo)
+
+Before every commit: `deno task check && deno task lint && deno task fmt && deno task test`. CI
+(`.github/workflows/ci.yml`) runs the same on push/PR, so a red check = don't deploy. Deno Deploy
+auto-deploys `main`, so **only push what passes locally.**
+
+**Rotating a secret** (PAT compromised, or changing `AUTH_TOKEN`): update the value in Deno Deploy →
+Environment Variables and redeploy (or just save — it triggers a new isolate). Old `AUTH_TOKEN`
+cookies/URLs stop working immediately; re-open the `?token=` URL to re-bootstrap.
+
+**Load-bearing invariants — do NOT change these without re-verifying against atlas**
+(`~/Scripts/atlas`):
+
+- `src/crypto.ts`: ChaCha20-Poly1305, nonce = 12 zero bytes, no AAD, asset = ciphertext‖16-byte tag,
+  `chunk_id = blake3(asset)` lowercase hex. Any drift = decryption fails.
+- `src/rootdoc.ts` / `src/manifest.ts`: the ROOT manifest **pointer** carries `[cid_hex, key_hex]`
+  (HEX); manifest entry `c` carries raw 32-byte msgpack-bin `[cid, key]` (NOT hex). This
+  hex-vs-bytes split is the classic trap — `manifest.ts` asserts 32-byte length to catch a mix-up.
+- `src/auth.ts` / `src/server.ts`: the whole router is wrapped once in `withAuth`; token compare is
+  constant-time; the read-only PAT is server-side only and is stripped before the signed-asset
+  redirect in `src/github.ts`. Every response sends `nosniff`; HTML sends a restrictive CSP.
+- If you add a route, it's auto-gated (single wrap point) — but any new HTML must HTML-escape all
+  vault-derived strings (`src/views/escape.ts`) since vault contents are untrusted.
+
+**Common safe edits:** add a MIME type in `src/mime.ts` (keep active-content types like
+`.svg`/`.html` OUT of the map so they download rather than render); tweak the HTML/CSS in
+`src/views/`; adjust the chunk-index rebuild cooldown (`REBUILD_COOLDOWN_MS` in `src/chunkindex.ts`)
+or ROOT TTL (`ROOT_TTL_MS` in `src/vault.ts`). Add a test for anything you change.
+
+**If a vault uses chunks too large for the 512 MB isolate:** no code change — host `main.ts` on an
+always-on VM (`deno task start`) behind Caddy for HTTPS instead of Deno Deploy.

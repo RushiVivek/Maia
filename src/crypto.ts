@@ -3,7 +3,8 @@
  *   - ChaCha20-Poly1305 AEAD, 256-bit key.
  *   - Nonce is FIXED at 12 zero bytes. No associated data.
  *   - Stored asset bytes = ciphertext || 16-byte Poly1305 tag.
- *   - chunk_id = blake3(ciphertext), 32-byte digest, lowercase hex.
+ *   - chunk_id = blake3 over the WHOLE stored asset (ciphertext||tag, i.e. what
+ *     atlas calls the "ciphertext"), 32-byte digest, lowercase hex.
  *
  * The fixed nonce is safe here because atlas uses convergent encryption: each
  * chunk's key is derived per-plaintext, so no (key, nonce) pair ever repeats.
@@ -35,7 +36,7 @@ export function decryptChunk(key: Uint8Array, asset: Uint8Array): Uint8Array {
   }
 }
 
-/** Compute the chunk_id (blake3 of the ciphertext) as lowercase hex. */
+/** Compute the chunk_id (blake3 of the whole stored asset, ciphertext||tag) as lowercase hex. */
 export function chunkIdHex(asset: Uint8Array): string {
   return encodeHex(blake3(asset, { dkLen: CHUNK_ID_LEN }));
 }
